@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CensusSaathi AI Prototype</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Smooth scrolling for chat */
+        .scroll-smooth { scroll-behavior: smooth; }
+    </style>
+
+    <!-- Import Maps for React and Lucide Icons -->
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "https://esm.sh/react@18.2.0",
+            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+            "lucide-react": "https://esm.sh/lucide-react@0.292.0"
+        }
+    }
+    </script>
+    
+    <!-- Babel Standalone for in-browser JSX compilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 selection:bg-orange-200 min-h-screen flex flex-col">
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect, useRef } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import { 
+            Home, Info, FileText, Calendar, BarChart2, Shield, MessageSquare, 
+            CheckCircle, AlertTriangle, Globe, ChevronRight, Search, User,
+            Users, MapPin, Menu, X, FileQuestion, ThumbsUp, ThumbsDown,
+            ArrowRight, ShieldCheck, Send, Loader2, Lock, EyeOff
+        } from 'lucide-react';
+
+        // ==========================================
+        // 1. DATA & CONSTANTS
+        // ==========================================
+
+        const OFFICIAL_DISCLAIMER = "This is an independent informational prototype for demonstration purposes. It is not an official Government of India website and does not submit real data.";
+
+        const CENSUS_DATES = [
+            { state: "Andaman and Nicobar Islands", selfEnum: "1 Apr - 15 Apr 2026", houseListing: "16 Apr - 15 May 2026", status: "Completed" },
+            { state: "Delhi", selfEnum: "1 Apr - 15 Apr 2026", houseListing: "16 Apr - 15 May 2026", status: "Completed" },
+            { state: "Karnataka", selfEnum: "1 Apr - 15 Apr 2026", houseListing: "16 Apr - 15 May 2026", status: "Completed" },
+            { state: "Maharashtra", selfEnum: "1 May - 15 May 2026", houseListing: "16 May - 14 Jun 2026", status: "Completed" },
+            { state: "Uttar Pradesh", selfEnum: "7 May - 21 May 2026", houseListing: "22 May - 20 Jun 2026", status: "Completed" },
+            { state: "Assam", selfEnum: "2 Aug - 16 Aug 2026", houseListing: "17 Aug - 15 Sep 2026", status: "Active" },
+            { state: "West Bengal", selfEnum: "To be decided", houseListing: "To be decided", status: "Pending" }
+        ];
+
+        const MOCK_DATASET = [
+            { state: "Maharashtra", population: 112, literacy: 82.3, urban: 45.2 },
+            { state: "Uttar Pradesh", population: 199, literacy: 67.7, urban: 22.3 },
+            { state: "Karnataka", population: 61, literacy: 75.4, urban: 38.7 },
+            { state: "Tamil Nadu", population: 72, literacy: 80.1, urban: 48.4 }
+        ];
+
+        const TRANSLATIONS = {
+            en: {
+                nav_home: "Home", nav_census: "Census 2027", nav_self_enum: "Self-Enumeration",
+                nav_dates: "Dates & States", nav_data: "Data Explorer", nav_privacy: "Privacy & Safety",
+                nav_ai: "AI Assistant", nav_verify: "Verify Message", nav_dashboard: "Dashboard",
+                hero_title: "Census 2027, Made Simple.",
+                hero_subtitle: "Understand the census, check important dates, complete self-enumeration, and get trustworthy answers with AI.",
+                btn_start: "Start Self-Enumeration", btn_explore: "Explore Census 2027", disclaimer: OFFICIAL_DISCLAIMER
+            },
+            hi: {
+                nav_home: "मुख्य पृष्ठ", nav_census: "जनगणना 2027", nav_self_enum: "स्व-गणना",
+                nav_dates: "तिथियां और राज्य", nav_data: "डेटा एक्सप्लोरर", nav_privacy: "गोपनीयता और सुरक्षा",
+                nav_ai: "AI सहायक", nav_verify: "संदेश जांचें", nav_dashboard: "डैशबोर्ड",
+                hero_title: "जनगणना 2027, अब आसान।",
+                hero_subtitle: "जनगणना को समझें, महत्वपूर्ण तिथियां जांचें, स्व-गणना पूरी करें और AI के साथ विश्वसनीय उत्तर पाएं।",
+                btn_start: "स्व-गणना शुरू करें", btn_explore: "जनगणना 2027 देखें",
+                disclaimer: "यह प्रदर्शन उद्देश्यों के लिए एक स्वतंत्र प्रोटोटाइप है। यह भारत सरकार की आधिकारिक वेबसाइट नहीं है।"
+            },
+            mr: {
+                nav_home: "मुख्य पान", nav_census: "जनगणना 2027", nav_self_enum: "स्व-नोंदणी",
+                nav_dates: "तारखा आणि राज्ये", nav_data: "डेटा एक्सप्लोरर", nav_privacy: "गोपनीयता आणि सुरक्षा",
+                nav_ai: "AI सहाय्यक", nav_verify: "संदेश तपासा", nav_dashboard: "डॅशबोर्ड",
+                hero_title: "जनगणना 2027, सोप्या भाषेत.",
+                hero_subtitle: "जनगणना समजून घ्या, महत्त्वाच्या तारखा तपासा, स्व-नोंदणी पूर्ण करा आणि AI सोबत खात्रीशीर उत्तरे मिळवा.",
+                btn_start: "स्व-नोंदणी सुरू करा", btn_explore: "जनगणना 2027 पहा",
+                disclaimer: "हा प्रात्यक्षिकासाठी एक स्वतंत्र प्रोटोटाइप आहे. हे अधिकृत सरकारी संकेतस्थळ नाही."
+            }
+        };
+
+        // ==========================================
+        // 2. GEMINI API UTILS
+        // ==========================================
+
+        const API_KEY = ""; // Enter your Gemini API key here
+
+        const callGeminiText = async (prompt, systemInstruction = "") => {
+            if (!API_KEY) {
+                // Fallback for demo without API key to prevent crashing
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                return "Demo Mode: I am CensusSaathi AI. (Note: The API key is not currently configured, so I am providing a mock response to demonstrate the UI. Please check the official government portal for factual data).";
+            }
+
+            try {
+                const payload = { contents: [{ parts: [{ text: prompt }] }] };
+                if (systemInstruction) payload.systemInstruction = { parts: [{ text: systemInstruction }] };
+                
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) throw new Error(`HTTP Error! Status: ${response.status}`);
+                const data = await response.json();
+                return data.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I could not process that request at the moment.";
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                return "Error connecting to AI Assistant. Please check your network or API key.";
+            }
+        };
+
+        const callGeminiJSON = async (prompt, systemInstruction, schemaProperties) => {
+            if (!API_KEY) {
+                // Fallback JSON for demo without API key
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                return {
+                    summary: "Demo Mode Active (API key not found).",
+                    status: "Cannot verify",
+                    explanation: "The application is currently running in demonstration mode without an active API key. Please connect a valid Gemini API key to enable live fact-checking.",
+                    action: "Treat all unverified claims with caution and rely only on official government sources."
+                };
+            }
+
+            try {
+                const payload = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    systemInstruction: { parts: [{ text: systemInstruction }] },
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: { type: "OBJECT", properties: schemaProperties }
+                    }
+                };
+                
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) throw new Error(`HTTP Error! Status: ${response.status}`);
+                const data = await response.json();
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!text) throw new Error("No text content returned from the API.");
+                return JSON.parse(text);
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                return null;
+            }
+        };
+
+        // ==========================================
+        // 3. REUSABLE COMPONENTS
+        // ==========================================
+
+        const Card = ({ children, className = "", onClick = null }) => (
+            <div onClick={onClick} className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden ${onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''} ${className}`}>
+                {children}
+            </div>
+        );
+
+        const Button = ({ children, variant = "primary", className = "", ...props }) => {
+            const base = "inline-flex items-center justify-center font-medium rounded-lg transition-colors px-5 py-2.5";
+            const variants = {
+                primary: "bg-blue-900 text-white hover:bg-blue-800",
+                secondary: "bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200",
+                outline: "bg-transparent text-blue-900 border border-blue-900 hover:bg-blue-50",
+                ghost: "bg-transparent text-slate-600 hover:bg-slate-100"
+            };
+            return (
+                <button className={`${base} ${variants[variant]} ${className}`} {...props}>{children}</button>
+            );
+        };
+
+        const SimpleBarChart = ({ data, labelKey, valueKey, colorClass = "bg-blue-600" }) => {
+            const maxVal = Math.max(...data.map(d => d[valueKey]));
+            return (
+                <div className="w-full space-y-4">
+                    {data.map((item, idx) => {
+                        const percentage = (item[valueKey] / maxVal) * 100;
+                        return (
+                            <div key={idx} className="flex flex-col gap-1">
+                                <div className="flex justify-between text-sm font-medium text-slate-700">
+                                    <span>{item[labelKey]}</span><span>{item[valueKey]}</span>
+                                </div>
+                                <div className="w-full bg-slate-100 rounded-full h-2.5">
+                                    <div className={`${colorClass} h-2.5 rounded-full`} style={{ width: `${percentage}%` }}></div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        };
+
+        // ==========================================
+        // 4. PAGE COMPONENTS
+        // ==========================================
+
+        const HomePage = ({ navigate, t }) => (
+            <div className="animate-in fade-in duration-500">
+                <section className="bg-gradient-to-b from-blue-900 to-blue-800 text-white py-16 md:py-24 px-6">
+                    <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-12 items-center">
+                        <div className="space-y-6">
+                            <div className="inline-block bg-blue-800 border border-blue-700 rounded-full px-4 py-1 text-sm font-medium text-blue-100 mb-2">Digital Enumeration 2027</div>
+                            <h1 className="text-4xl md:text-5xl font-bold leading-tight">{t('hero_title')}</h1>
+                            <p className="text-lg text-blue-100 max-w-lg">{t('hero_subtitle')}</p>
+                            <div className="flex flex-wrap gap-4 pt-4">
+                                <Button variant="primary" className="bg-orange-500 hover:bg-orange-600 border-none text-white shadow-lg" onClick={() => navigate('self-enumeration')}>
+                                    {t('btn_start')} <ChevronRight className="w-5 h-5 ml-2" />
+                                </Button>
+                                <Button variant="outline" className="text-white border-white hover:bg-white hover:text-blue-900" onClick={() => navigate('census-2027')}>
+                                    {t('btn_explore')}
+                                </Button>
+                            </div>
+                        </div>
+                        <div className="relative">
+                            <div className="absolute inset-0 bg-gradient-to-tr from-orange-400 to-green-400 rounded-2xl blur-2xl opacity-20 transform rotate-3"></div>
+                            <Card className="relative bg-white/10 backdrop-blur-md border border-white/20 text-white p-6 shadow-2xl">
+                                <div className="flex items-center justify-between mb-6">
+                                    <h3 className="font-semibold text-lg flex items-center"><Shield className="w-5 h-5 mr-2 text-green-400" /> Secure Platform</h3>
+                                    <span className="text-xs font-medium bg-white/20 px-2 py-1 rounded">Prototype</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-white/10 p-4 rounded-lg">
+                                        <div className="text-sm font-medium mb-1 flex items-center"><CheckCircle className="w-4 h-4 mr-1 text-orange-300"/> Digital</div>
+                                        <div className="text-xs text-blue-100">Paperless process</div>
+                                    </div>
+                                    <div className="bg-white/10 p-4 rounded-lg">
+                                        <div className="text-sm font-medium mb-1 flex items-center"><User className="w-4 h-4 mr-1 text-green-300"/> Self-Enum</div>
+                                        <div className="text-xs text-blue-100">Complete yourself</div>
+                                    </div>
+                                    <div className="bg-white/10 p-4 rounded-lg">
+                                        <div className="text-sm font-medium mb-1 flex items-center"><Globe className="w-4 h-4 mr-1 text-blue-300"/> Languages</div>
+                                        <div className="text-xs text-blue-100">16+ Local languages</div>
+                                    </div>
+                                    <div className="bg-white/10 p-4 rounded-lg">
+                                        <div className="text-sm font-medium mb-1 flex items-center"><Lock className="w-4 h-4 mr-1 text-purple-300"/> Privacy</div>
+                                        <div className="text-xs text-blue-100">Strictly confidential</div>
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
+                    </div>
+                </section>
+
+                <section className="py-16 px-6 bg-slate-50">
+                    <div className="max-w-6xl mx-auto">
+                        <div className="text-center mb-12">
+                            <h2 className="text-3xl font-bold text-blue-950 mb-4">How Can We Help You?</h2>
+                            <p className="text-slate-600 max-w-2xl mx-auto">Navigate the historic Census 2027 process securely and confidently with our digital tools.</p>
+                        </div>
+                        <div className="grid md:grid-cols-4 gap-6">
+                            <FeatureCard icon={<Info className="w-8 h-8 text-blue-600" />} title="Understand" desc="Learn what Census 2027 collects and why it matters." onClick={() => navigate('census-2027')} />
+                            <FeatureCard icon={<FileText className="w-8 h-8 text-orange-500" />} title="Self-Enumerate" desc="Follow a simple step-by-step digital enumeration guide." onClick={() => navigate('self-enumeration')} />
+                            <FeatureCard icon={<ShieldCheck className="w-8 h-8 text-green-600" />} title="Verify Claims" desc="Identify misleading messages and find trustworthy info." onClick={() => navigate('verify')} />
+                            <FeatureCard icon={<BarChart2 className="w-8 h-8 text-purple-600" />} title="Explore Data" desc="Understand historical census information via interactive charts." onClick={() => navigate('data-explorer')} />
+                        </div>
+                    </div>
+                </section>
+
+                <section className="py-16 px-6 bg-white border-t border-slate-100">
+                    <div className="max-w-6xl mx-auto">
+                        <h2 className="text-3xl font-bold text-blue-950 mb-10 text-center">How Census 2027 Works</h2>
+                        <div className="grid md:grid-cols-2 gap-8">
+                            <Card className="p-8 border-l-4 border-l-orange-500">
+                                <div className="bg-orange-100 text-orange-700 text-sm font-bold px-3 py-1 rounded-full inline-block mb-4">Phase 1 (Apr - Sep 2026)</div>
+                                <h3 className="text-xl font-bold mb-3 text-slate-800">House Listing & Housing Census</h3>
+                                <p className="text-slate-600 mb-4">This phase collects data on housing conditions, amenities, and assets. A unique geo-tagged identification is assigned to every structure.</p>
+                                <ul className="space-y-2 text-sm text-slate-700">
+                                    <li className="flex items-start"><CheckCircle className="w-4 h-4 text-green-500 mr-2 mt-0.5" /> 15-day Self-Enumeration window</li>
+                                    <li className="flex items-start"><CheckCircle className="w-4 h-4 text-green-500 mr-2 mt-0.5" /> 30-day door-to-door physical survey</li>
+                                </ul>
+                            </Card>
+                            <Card className="p-8 border-l-4 border-l-green-600">
+                                <div className="bg-green-100 text-green-800 text-sm font-bold px-3 py-1 rounded-full inline-block mb-4">Phase 2 (Feb 2027)</div>
+                                <h3 className="text-xl font-bold mb-3 text-slate-800">Population Enumeration</h3>
+                                <p className="text-slate-600 mb-4">This phase collects detailed demographic, socio-economic, educational, and cultural data of all individuals across households.</p>
+                                <ul className="space-y-2 text-sm text-slate-700">
+                                    <li className="flex items-start"><CheckCircle className="w-4 h-4 text-green-500 mr-2 mt-0.5" /> Digital data collection via mobile apps</li>
+                                    <li className="flex items-start"><CheckCircle className="w-4 h-4 text-green-500 mr-2 mt-0.5" /> Comprehensive data capture for policy making</li>
+                                </ul>
+                            </Card>
+                        </div>
+                    </div>
+                </section>
+
+                <button onClick={() => navigate('assistant')} className="fixed bottom-6 right-6 bg-blue-900 text-white p-4 rounded-full shadow-2xl hover:bg-blue-800 transition-transform hover:scale-105 z-50 flex items-center group">
+                    <MessageSquare className="w-6 h-6" />
+                    <span className="max-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 group-hover:max-w-[150px] group-hover:ml-3 font-medium">Ask CensusSaathi</span>
+                </button>
+            </div>
+        );
+
+        const FeatureCard = ({ icon, title, desc, onClick }) => (
+            <Card onClick={onClick} className="p-6 text-center hover:-translate-y-1 transition-transform duration-300">
+                <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">{icon}</div>
+                <h3 className="font-bold text-lg text-slate-800 mb-2">{title}</h3>
+                <p className="text-slate-600 text-sm">{desc}</p>
+            </Card>
+        );
+
+        const CensusInfoPage = () => (
+            <div className="max-w-4xl mx-auto py-10 px-6 animate-in fade-in duration-500">
+                <h1 className="text-3xl md:text-4xl font-bold text-blue-950 mb-4">Census 2027: What You Need to Know</h1>
+                <p className="text-lg text-slate-600 mb-10">Understand the census, its phases, participation process, privacy, and important dates.</p>
+                <div className="space-y-12">
+                    <section>
+                        <h2 className="text-2xl font-bold text-slate-800 border-b pb-2 mb-6">What is a Census?</h2>
+                        <p className="text-slate-700 leading-relaxed mb-6">The Census is the most comprehensive source of statistical information on different characteristics of the people of India. Conducted every 10 years, Census 2027 is historic as it marks India's first fully digital enumeration process, enabling faster and more secure data collection.</p>
+                        <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 flex flex-col md:flex-row gap-6 items-center">
+                            <div className="w-16 h-16 bg-blue-900 rounded-full flex flex-shrink-0 items-center justify-center text-white font-bold text-xl">16th</div>
+                            <div>
+                                <h4 className="font-bold text-blue-900 text-lg mb-1">16th Census of India</h4>
+                                <p className="text-blue-800 text-sm">Census 2027 will be the 16th in the continuous series since 1872, and the 8th since independence. It is a critical foundation for governance and resource allocation.</p>
+                            </div>
+                        </div>
+                    </section>
+                    <section>
+                        <h2 className="text-2xl font-bold text-slate-800 border-b pb-2 mb-6">Why Does Census Data Matter?</h2>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            {[
+                                { icon: <MapPin className="text-orange-500" />, title: "Public Planning" },
+                                { icon: <Home className="text-green-600" />, title: "Housing & Amenities" },
+                                { icon: <FileText className="text-blue-500" />, title: "Education Policy" },
+                                { icon: <Shield className="text-purple-500" />, title: "Healthcare Planning" },
+                                { icon: <Users className="text-red-500" />, title: "Employment Data" },
+                                { icon: <BarChart2 className="text-teal-500" />, title: "Resource Allocation" },
+                            ].map((item, idx) => (
+                                <Card key={idx} className="p-4 flex items-center space-x-3 bg-slate-50">
+                                    <div className="bg-white p-2 rounded-lg shadow-sm">{item.icon}</div>
+                                    <span className="font-medium text-sm text-slate-700">{item.title}</span>
+                                </Card>
+                            ))}
+                        </div>
+                    </section>
+                    <section>
+                        <h2 className="text-2xl font-bold text-slate-800 border-b pb-2 mb-6">Frequently Asked Questions</h2>
+                        <div className="space-y-4">
+                            <FAQItem q="Is self-enumeration mandatory?" a="No, self-enumeration is an optional facility. If you choose not to use the digital portal, an enumerator will visit your home during the scheduled physical survey." />
+                            <FAQItem q="What information is collected?" a="Phase 1 focuses on housing details (building material, amenities, vehicles). Phase 2 focuses on individual demographics (age, education, occupation). Please refer to the latest Ministry of Home Affairs notifications for exact questions." />
+                            <FAQItem q="How is my information protected?" a="Under the Census Act 1948, all personal information is strictly confidential. It cannot be used as evidence in court or accessed via RTI. The digital census employs robust encryption." />
+                        </div>
+                    </section>
+                </div>
+            </div>
+        );
+
+        const FAQItem = ({ q, a }) => {
+            const [open, setOpen] = useState(false);
+            return (
+                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                    <button className="w-full text-left px-5 py-4 font-semibold text-slate-800 bg-slate-50 hover:bg-slate-100 flex justify-between items-center" onClick={() => setOpen(!open)}>
+                        {q} <ChevronRight className={`w-5 h-5 transition-transform ${open ? 'rotate-90' : ''}`} />
+                    </button>
+                    {open && <div className="px-5 py-4 text-slate-600 bg-white leading-relaxed">{a}</div>}
+                </div>
+            );
+        }
+
+        const SelfEnumerationWizard = ({ navigate }) => {
+            const [step, setStep] = useState(1);
+            const [formData, setFormData] = useState({
+                membersCount: 1, headName: '', address: '', members: [{ name: '', age: '', gender: '' }]
+            });
+
+            const updateFormData = (key, val) => setFormData(prev => ({ ...prev, [key]: val }));
+            const updateMember = (index, key, val) => {
+                const newMembers = [...formData.members];
+                newMembers[index] = { ...newMembers[index], [key]: val };
+                setFormData(prev => ({ ...prev, members: newMembers }));
+            };
+            const addMember = () => setFormData(prev => ({ ...prev, membersCount: prev.membersCount + 1, members: [...prev.members, { name: '', age: '', gender: '' }] }));
+            const handleNext = () => setStep(s => s + 1);
+            const handlePrev = () => setStep(s => s - 1);
+
+            return (
+                <div className="max-w-3xl mx-auto py-10 px-6 animate-in fade-in duration-300">
+                    <div className="mb-8">
+                        <h1 className="text-3xl font-bold text-blue-950">Self-Enumeration Portal</h1>
+                        <p className="text-slate-500 mt-2">Demonstration Prototype</p>
+                    </div>
+
+                    <div className="flex items-center justify-between mb-8 relative">
+                        <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-slate-200 -z-10"></div>
+                        <div className="absolute left-0 top-1/2 transform -translate-y-1/2 h-1 bg-orange-500 -z-10 transition-all duration-300" style={{ width: `${((step - 1) / 4) * 100}%` }}></div>
+                        {[1, 2, 3, 4, 5].map(num => (
+                            <div key={num} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 ${step >= num ? 'bg-orange-500 border-orange-500 text-white' : 'bg-white border-slate-300 text-slate-400'}`}>
+                                {num}
+                            </div>
+                        ))}
+                    </div>
+
+                    <Card className="p-6 md:p-8">
+                        {step === 1 && (
+                            <div className="space-y-6">
+                                <h2 className="text-2xl font-bold text-slate-800">Before You Start</h2>
+                                <div className="bg-orange-50 p-4 rounded-lg border border-orange-100 flex items-start text-orange-800">
+                                    <AlertTriangle className="w-5 h-5 mr-3 mt-0.5 flex-shrink-0" />
+                                    <p className="text-sm font-medium">This is a demonstration prototype. Do not enter real sensitive personal information like Aadhaar, bank details, or exact addresses.</p>
+                                </div>
+                                <ul className="space-y-4 mb-6 text-slate-700">
+                                    <li className="flex items-center"><CheckCircle className="w-5 h-5 text-green-500 mr-3" /> Understand who should be included</li>
+                                    <li className="flex items-center"><CheckCircle className="w-5 h-5 text-green-500 mr-3" /> Check your state's schedule dates</li>
+                                    <li className="flex items-center"><CheckCircle className="w-5 h-5 text-green-500 mr-3" /> Never share OTP/passwords with anyone</li>
+                                </ul>
+                                <Button onClick={handleNext} className="w-full">Agree & Continue</Button>
+                            </div>
+                        )}
+
+                        {step === 2 && (
+                            <div className="space-y-6">
+                                <h2 className="text-2xl font-bold text-slate-800">Household Details</h2>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Head of Household Name (Demo)</label>
+                                        <input type="text" value={formData.headName} onChange={(e) => updateFormData('headName', e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Enter name" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Approximate Location (Demo)</label>
+                                        <input type="text" value={formData.address} onChange={(e) => updateFormData('address', e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="City or Area" />
+                                    </div>
+                                </div>
+                                <div className="flex justify-between pt-4">
+                                    <Button variant="outline" onClick={handlePrev}>Back</Button>
+                                    <Button onClick={handleNext}>Next: Person Details</Button>
+                                </div>
+                            </div>
+                        )}
+
+                        {step === 3 && (
+                            <div className="space-y-6">
+                                <div className="flex justify-between items-center">
+                                    <h2 className="text-2xl font-bold text-slate-800">Person Details</h2>
+                                    <Button variant="ghost" className="text-blue-600 text-sm py-1 px-3" onClick={addMember}>+ Add Member</Button>
+                                </div>
+                                <div className="space-y-6 max-h-[50vh] overflow-y-auto p-1">
+                                    {formData.members.map((member, idx) => (
+                                        <div key={idx} className="p-4 border border-slate-200 rounded-lg bg-slate-50 space-y-4">
+                                            <h4 className="font-bold text-slate-700 text-sm">Person {idx + 1} {idx === 0 ? "(Head)" : ""}</h4>
+                                            <div className="grid md:grid-cols-3 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-medium text-slate-600 mb-1">Name</label>
+                                                    <input type="text" value={member.name} onChange={(e) => updateMember(idx, 'name', e.target.value)} className="w-full p-2 text-sm border border-slate-300 rounded outline-none" placeholder="Name" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-slate-600 mb-1">Age</label>
+                                                    <input type="number" value={member.age} onChange={(e) => updateMember(idx, 'age', e.target.value)} className="w-full p-2 text-sm border border-slate-300 rounded outline-none" placeholder="Age" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-slate-600 mb-1">Gender</label>
+                                                    <select value={member.gender} onChange={(e) => updateMember(idx, 'gender', e.target.value)} className="w-full p-2 text-sm border border-slate-300 rounded outline-none bg-white">
+                                                        <option value="">Select</option>
+                                                        <option value="Male">Male</option>
+                                                        <option value="Female">Female</option>
+                                                        <option value="Transgender">Transgender</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex justify-between pt-4">
+                                    <Button variant="outline" onClick={handlePrev}>Back</Button>
+                                    <Button onClick={handleNext}>Review</Button>
+                                </div>
+                            </div>
+                        )}
+
+                        {step === 4 && (
+                            <div className="space-y-6">
+                                <h2 className="text-2xl font-bold text-slate-800">Review Information</h2>
+                                <div className="bg-slate-50 p-5 rounded-lg border border-slate-200">
+                                    <h3 className="font-semibold text-slate-800 mb-3 border-b pb-2">Household Summary</h3>
+                                    <div className="text-sm text-slate-600 grid grid-cols-2 gap-2 mb-6">
+                                        <div><span className="font-medium text-slate-700">Head:</span> {formData.headName || 'N/A'}</div>
+                                        <div><span className="font-medium text-slate-700">Location:</span> {formData.address || 'N/A'}</div>
+                                        <div><span className="font-medium text-slate-700">Total Members:</span> {formData.membersCount}</div>
+                                    </div>
+                                    <h3 className="font-semibold text-slate-800 mb-3 border-b pb-2">Persons</h3>
+                                    <div className="space-y-2">
+                                        {formData.members.map((m, idx) => (
+                                            <div key={idx} className="text-sm text-slate-600 flex justify-between bg-white p-2 rounded border border-slate-100">
+                                                <span className="font-medium">{m.name || `Person ${idx+1}`}</span>
+                                                <span>{m.age ? `${m.age} yrs` : '-'} | {m.gender || '-'}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="flex justify-between pt-4">
+                                    <Button variant="outline" onClick={handlePrev}>Edit</Button>
+                                    <Button onClick={handleNext} className="bg-green-600 hover:bg-green-700">Demo Submit</Button>
+                                </div>
+                            </div>
+                        )}
+
+                        {step === 5 && (
+                            <div className="text-center py-10">
+                                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <CheckCircle className="w-10 h-10 text-green-600" />
+                                </div>
+                                <h2 className="text-3xl font-bold text-slate-800 mb-2">Demo Submission Complete</h2>
+                                <p className="text-slate-600 mb-6 max-w-md mx-auto">Your demonstration data has been processed locally. No actual data was sent to any server.</p>
+                                <div className="bg-slate-50 p-4 rounded-lg inline-block text-sm font-mono text-slate-700 mb-8 border border-slate-200">
+                                    Demo Ref ID: CEN2027-{Math.random().toString(36).substr(2, 6).toUpperCase()}
+                                </div>
+                                <div><Button onClick={() => navigate('home')}>Return to Home</Button></div>
+                            </div>
+                        )}
+                    </Card>
+                </div>
+            );
+        };
+
+        const DatesPage = () => {
+            const [search, setSearch] = useState('');
+            const filtered = CENSUS_DATES.filter(d => d.state.toLowerCase().includes(search.toLowerCase()));
+
+            return (
+                <div className="max-w-5xl mx-auto py-10 px-6 animate-in fade-in">
+                    <div className="mb-10 text-center">
+                        <h1 className="text-3xl md:text-4xl font-bold text-blue-950 mb-3">Check Your Census Schedule</h1>
+                        <p className="text-slate-600">Find self-enumeration and survey-related dates for your state based on the phased rollout.</p>
+                    </div>
+                    <div className="mb-8 max-w-md mx-auto relative">
+                        <Search className="w-5 h-5 absolute left-3 top-3 text-slate-400" />
+                        <input type="text" placeholder="Search your state..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none shadow-sm" />
+                    </div>
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50 text-slate-700 text-sm uppercase tracking-wider border-b border-slate-200">
+                                        <th className="p-4 font-semibold">State / UT</th>
+                                        <th className="p-4 font-semibold">Self-Enum (Phase 1)</th>
+                                        <th className="p-4 font-semibold">House Listing (Phase 1)</th>
+                                        <th className="p-4 font-semibold text-center">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {filtered.map((row, idx) => (
+                                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                            <td className="p-4 font-medium text-slate-800 flex items-center"><MapPin className="w-4 h-4 text-slate-400 mr-2" />{row.state}</td>
+                                            <td className="p-4 text-sm text-slate-600">{row.selfEnum}</td>
+                                            <td className="p-4 text-sm text-slate-600">{row.houseListing}</td>
+                                            <td className="p-4 text-center">
+                                                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${row.status === 'Completed' ? 'bg-slate-100 text-slate-600' : row.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>{row.status}</span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        {filtered.length === 0 && <div className="p-8 text-center text-slate-500">No state found matching your search.</div>}
+                        <div className="bg-blue-50 p-4 text-xs text-blue-800 border-t border-blue-100 text-center">
+                            Note: Phase 2 (Population Enumeration) is scheduled for February 2027 nationally. Dates shown are approximate prototypes.
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const DataExplorerPage = () => (
+            <div className="max-w-6xl mx-auto py-10 px-6 animate-in fade-in">
+                <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+                    <div>
+                        <h1 className="text-3xl font-bold text-blue-950 mb-2">Explore India's Census Data</h1>
+                        <p className="text-slate-600 flex items-center"><AlertTriangle className="w-4 h-4 text-orange-500 mr-1.5" /> Historical/Demo data shown for illustrative purposes only.</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <select className="border border-slate-300 rounded-lg p-2 text-sm bg-white outline-none"><option>Census 2011 (Demo)</option></select>
+                    </div>
+                </div>
+                <div className="grid md:grid-cols-3 gap-6 mb-8">
+                    <Card className="p-5 border-l-4 border-l-blue-500 bg-slate-50"><div className="text-sm font-medium text-slate-500 mb-1">Total Population</div><div className="text-3xl font-bold text-slate-800">1.21 B</div></Card>
+                    <Card className="p-5 border-l-4 border-l-green-500 bg-slate-50"><div className="text-sm font-medium text-slate-500 mb-1">Overall Literacy</div><div className="text-3xl font-bold text-slate-800">74.04%</div></Card>
+                    <Card className="p-5 border-l-4 border-l-orange-500 bg-slate-50"><div className="text-sm font-medium text-slate-500 mb-1">Urban Population</div><div className="text-3xl font-bold text-slate-800">31.16%</div></Card>
+                </div>
+                <div className="grid md:grid-cols-2 gap-8">
+                    <Card className="p-6"><h3 className="font-bold text-lg mb-6 flex items-center"><BarChart2 className="w-5 h-5 mr-2 text-blue-600" /> State Literacy Comparison (Demo)</h3><SimpleBarChart data={MOCK_DATASET} labelKey="state" valueKey="literacy" colorClass="bg-blue-500" /></Card>
+                    <Card className="p-6"><h3 className="font-bold text-lg mb-6 flex items-center"><Users className="w-5 h-5 mr-2 text-green-600" /> Urban Population % (Demo)</h3><SimpleBarChart data={MOCK_DATASET} labelKey="state" valueKey="urban" colorClass="bg-green-500" /></Card>
+                </div>
+            </div>
+        );
+
+        const ClaimCheckerPage = () => {
+            const [claim, setClaim] = useState('');
+            const [result, setResult] = useState(null);
+            const [loading, setLoading] = useState(false);
+
+            const handleVerify = async () => {
+                if(!claim.trim()) return;
+                setLoading(true);
+                setResult(null);
+                const prompt = `Analyze this message circulating about India's Census 2027: "${claim}"`;
+                const sysInst = `You are a fact-checking assistant for Census 2027. Determine if the claim is valid, partly valid, or a scam/misinformation. Keep tone objective. 
+                Rule: Never ask users to share OTPs or money.
+                Output JSON exactly with these properties:
+                - summary: 1 sentence summary
+                - status: exactly one of ["Verified", "Partially verified", "Cannot verify", "Likely misleading"]
+                - explanation: 2-3 sentences explaining why.
+                - action: what the citizen should do.`;
+
+                const res = await callGeminiJSON(prompt, sysInst, { summary: {type: "STRING"}, status: {type: "STRING"}, explanation: {type: "STRING"}, action: {type: "STRING"} });
+
+                if(res) {
+                    setResult(res);
+                } else {
+                    setResult({ status: "Cannot verify", summary: "System could not process the claim.", explanation: "Our AI service is temporarily unavailable.", action: "Rely on official government sources." });
+                }
+                setLoading(false);
+            };
+
+            return (
+                <div className="max-w-3xl mx-auto py-10 px-6 animate-in fade-in">
+                    <div className="mb-8">
+                        <h1 className="text-3xl font-bold text-blue-950 flex items-center"><ShieldCheck className="w-8 h-8 mr-3 text-green-600" /> Is This Census Message Real?</h1>
+                        <p className="text-slate-600 mt-3">Paste a message or claim circulating on social media or WhatsApp. CensusSaathi AI will help you understand what can and cannot be verified.</p>
+                    </div>
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-start text-red-800 text-sm">
+                        <AlertTriangle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
+                        <p><strong>Safety Warning:</strong> Do not paste passwords, OTPs, financial information, Aadhaar numbers, or other sensitive personal information.</p>
+                    </div>
+                    <Card className="p-6 mb-8">
+                        <textarea value={claim} onChange={e => setClaim(e.target.value)} placeholder="Paste a Census 2027 message here... (e.g. 'Pay Rs 500 to register for digital census')" className="w-full h-32 p-4 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none mb-4 bg-slate-50"></textarea>
+                        <div className="flex justify-between items-center">
+                            <div className="flex gap-2">
+                                <button onClick={() => setClaim("Send your OTP to the census officer to complete enumeration.")} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-full transition-colors">Demo Claim 1</button>
+                                <button onClick={() => setClaim("Phase 1 of the census is completely digital.")} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-full transition-colors">Demo Claim 2</button>
+                            </div>
+                            <Button onClick={handleVerify} disabled={loading || !claim.trim()}>{loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Analyzing...</> : 'Check Claim'}</Button>
+                        </div>
+                    </Card>
+                    {result && (
+                        <Card className={`p-6 border-t-4 animate-in slide-in-from-bottom-4 ${result.status === 'Verified' ? 'border-t-green-500' : result.status === 'Likely misleading' ? 'border-t-red-500' : 'border-t-orange-500'}`}>
+                            <div className="flex items-start justify-between mb-4">
+                                <h3 className="font-bold text-xl text-slate-800">Analysis Result</h3>
+                                <span className={`px-3 py-1 rounded-full text-sm font-bold ${result.status === 'Verified' ? 'bg-green-100 text-green-800' : result.status === 'Likely misleading' ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800'}`}>{result.status}</span>
+                            </div>
+                            <div className="space-y-4 text-slate-700">
+                                <div><strong className="block text-slate-900 text-sm uppercase tracking-wide mb-1">Summary</strong><p>{result.summary}</p></div>
+                                <div><strong className="block text-slate-900 text-sm uppercase tracking-wide mb-1">Explanation</strong><p>{result.explanation}</p></div>
+                                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200"><strong className="block text-slate-900 text-sm uppercase tracking-wide mb-1">What You Should Do</strong><p className="text-blue-900 font-medium flex items-start"><ArrowRight className="w-4 h-4 mr-2 mt-0.5" /> {result.action}</p></div>
+                            </div>
+                        </Card>
+                    )}
+                </div>
+            );
+        };
+
+        const AIAssistantPage = () => {
+            const [messages, setMessages] = useState([{ role: 'ai', text: "Namaste! I am CensusSaathi, your AI guide for Census 2027. How can I help you today?" }]);
+            const [input, setInput] = useState('');
+            const [loading, setLoading] = useState(false);
+            const messagesEndRef = useRef(null);
+
+            const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            useEffect(() => { scrollToBottom(); }, [messages]);
+
+            const handleSend = async (textToUse = input) => {
+                if(!textToUse.trim()) return;
+                const userMsg = { role: 'user', text: textToUse };
+                setMessages(prev => [...prev, userMsg]);
+                setInput('');
+                setLoading(true);
+
+                const sysPrompt = `You are CensusSaathi AI, a helpful, citizen-facing assistant for India's Census 2027. 
+                Guidelines: Answer simply. Phase 1 is House Listing (Apr 2026), Phase 2 is Population Enumeration (Feb 2027). Remind users this is a prototype. Never ask for PII.`;
+
+                const aiRes = await callGeminiText(textToUse, sysPrompt);
+                setMessages(prev => [...prev, { role: 'ai', text: aiRes }]);
+                setLoading(false);
+            };
+
+            return (
+                <div className="max-w-4xl mx-auto py-6 px-4 md:px-6 h-[calc(100vh-80px)] flex flex-col">
+                    <div className="text-center mb-6">
+                        <h1 className="text-3xl font-bold text-blue-950">Ask CensusSaathi</h1>
+                        <p className="text-slate-600">Your trusted AI guide for understanding Census 2027.</p>
+                    </div>
+                    <Card className="flex-1 flex flex-col bg-slate-50 overflow-hidden border border-slate-200">
+                        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                            {messages.map((m, i) => (
+                                <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[85%] md:max-w-[75%] rounded-2xl p-4 ${m.role === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none shadow-sm'}`}>
+                                        {m.role === 'ai' && <div className="flex items-center text-xs font-bold text-blue-800 mb-2"><MessageSquare className="w-3 h-3 mr-1" /> CensusSaathi</div>}
+                                        <div className="whitespace-pre-wrap text-sm md:text-base leading-relaxed">{m.text}</div>
+                                    </div>
+                                </div>
+                            ))}
+                            {loading && (
+                                <div className="flex justify-start">
+                                    <div className="bg-white border border-slate-200 p-4 rounded-2xl rounded-bl-none flex items-center shadow-sm">
+                                        <Loader2 className="w-5 h-5 text-blue-500 animate-spin mr-2" />
+                                        <span className="text-slate-500 text-sm">Thinking...</span>
+                                    </div>
+                                </div>
+                            )}
+                            <div ref={messagesEndRef} />
+                        </div>
+                        <div className="p-4 bg-white border-t border-slate-200">
+                            <div className="flex flex-wrap gap-2 mb-3">
+                                <button onClick={() => handleSend("What is self-enumeration?")} className="text-xs bg-orange-50 hover:bg-orange-100 text-orange-700 px-3 py-1.5 rounded-full border border-orange-200 transition-colors">What is self-enumeration?</button>
+                                <button onClick={() => handleSend("When does Phase 2 start?")} className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full border border-blue-200 transition-colors">When does Phase 2 start?</button>
+                            </div>
+                            <div className="flex relative">
+                                <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} placeholder="Ask a question about Census 2027..." className="w-full pl-4 pr-12 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" />
+                                <button onClick={() => handleSend()} disabled={!input.trim() || loading} className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"><Send className="w-4 h-4" /></button>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+            );
+        };
+
+        const PrivacyPage = () => (
+            <div className="max-w-4xl mx-auto py-10 px-6 animate-in fade-in">
+                <div className="text-center mb-10">
+                    <h1 className="text-3xl md:text-4xl font-bold text-blue-950 mb-4 flex justify-center items-center"><Lock className="w-8 h-8 mr-3 text-blue-600" /> Your Data. Your Privacy.</h1>
+                    <p className="text-slate-600 text-lg">Understanding how your information is protected during the digital census.</p>
+                </div>
+                <Card className="p-8 mb-8 bg-blue-50 border-blue-100">
+                    <h2 className="text-xl font-bold text-blue-900 mb-2">CensusSaathi AI Privacy Promise</h2>
+                    <p className="text-blue-800">For this prototype demo, we <strong>do not</strong> store any sensitive personal information. Any data entered in the self-enumeration demo stays locally on your device and vanishes when you refresh.</p>
+                </Card>
+                <div className="grid md:grid-cols-2 gap-8 mb-10">
+                    <div>
+                        <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center"><EyeOff className="w-5 h-5 mr-2 text-slate-500" /> Never Share These</h3>
+                        <div className="space-y-3">
+                            {["Bank OTPs / Passwords", "Credit/Debit Card Details", "UPI PINs", "Money to 'fast-track' census"].map((item, i) => (
+                                <div key={i} className="flex items-center p-3 bg-red-50 border border-red-100 text-red-800 rounded-lg"><AlertTriangle className="w-4 h-4 mr-3 text-red-500 flex-shrink-0" /> {item}</div>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center"><ShieldCheck className="w-5 h-5 mr-2 text-green-600" /> Privacy Checklist</h3>
+                        <ul className="space-y-3">
+                            <li className="flex items-start"><CheckCircle className="w-5 h-5 mr-3 text-green-500 flex-shrink-0" /> <span className="text-slate-700">Verify the website ends in <strong>.gov.in</strong> before submitting real info.</span></li>
+                            <li className="flex items-start"><CheckCircle className="w-5 h-5 mr-3 text-green-500 flex-shrink-0" /> <span className="text-slate-700">Verify suspicious SMS claims using our Claim Checker.</span></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const DashboardPage = ({ navigate }) => (
+            <div className="max-w-6xl mx-auto py-10 px-6 animate-in fade-in">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 border-b border-slate-200 pb-6">
+                    <div>
+                        <h1 className="text-3xl font-bold text-blue-950 mb-2">Welcome to CensusSaathi</h1>
+                        <p className="text-slate-600">Your personalized digital census hub.</p>
+                    </div>
+                    <div className="mt-4 md:mt-0 bg-blue-50 px-4 py-2 rounded-lg border border-blue-100 flex items-center text-sm">
+                        <MapPin className="w-4 h-4 text-blue-600 mr-2" /><span className="font-medium text-blue-900 mr-2">Demo Region:</span><span className="text-blue-800">Maharashtra</span>
+                    </div>
+                </div>
+                <div className="grid md:grid-cols-4 gap-6 mb-10">
+                    <Card onClick={() => navigate('self-enumeration')} className="p-6 bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-md hover:-translate-y-1 transition-all group">
+                        <FileText className="w-8 h-8 mb-4 opacity-90 group-hover:scale-110 transition-transform" /><h3 className="font-bold text-lg mb-1">Self-Enumeration</h3><p className="text-orange-100 text-sm">Start the guided process</p>
+                    </Card>
+                    <Card onClick={() => navigate('dates')} className="p-6 hover:-translate-y-1 transition-all group">
+                        <Calendar className="w-8 h-8 mb-4 text-blue-600 opacity-90 group-hover:scale-110 transition-transform" /><h3 className="font-bold text-lg mb-1 text-slate-800">Check Dates</h3><p className="text-slate-500 text-sm">View your state schedule</p>
+                    </Card>
+                    <Card onClick={() => navigate('assistant')} className="p-6 hover:-translate-y-1 transition-all group">
+                        <MessageSquare className="w-8 h-8 mb-4 text-green-600 opacity-90 group-hover:scale-110 transition-transform" /><h3 className="font-bold text-lg mb-1 text-slate-800">Ask CensusSaathi</h3><p className="text-slate-500 text-sm">Get instant answers via AI</p>
+                    </Card>
+                    <Card onClick={() => navigate('verify')} className="p-6 hover:-translate-y-1 transition-all group">
+                        <ShieldCheck className="w-8 h-8 mb-4 text-purple-600 opacity-90 group-hover:scale-110 transition-transform" /><h3 className="font-bold text-lg mb-1 text-slate-800">Verify a Message</h3><p className="text-slate-500 text-sm">Check suspicious claims</p>
+                    </Card>
+                </div>
+                <h2 className="text-xl font-bold text-slate-800 mb-6">Your Census Journey</h2>
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 mb-8">
+                    <div className="flex flex-col md:flex-row justify-between items-center relative">
+                        <div className="hidden md:block absolute top-1/2 left-0 w-full h-1 bg-slate-100 -z-10 transform -translate-y-1/2"></div>
+                        {[
+                            { label: "Learn", active: true }, { label: "Check Schedule", active: true },
+                            { label: "Self-Enumeration", active: false }, { label: "Review", active: false }, { label: "Complete", active: false }
+                        ].map((step, i) => (
+                            <div key={i} className="flex flex-col items-center bg-white px-4 z-10 mb-6 md:mb-0">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 font-bold text-sm ${step.active ? 'bg-green-500 text-white' : 'bg-slate-100 text-slate-400 border-2 border-slate-200'}`}>
+                                    {step.active ? <CheckCircle className="w-5 h-5" /> : i + 1}
+                                </div>
+                                <span className={`text-sm font-medium ${step.active ? 'text-slate-800' : 'text-slate-400'}`}>{step.label}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        );
+
+        function App() {
+            const [currentRoute, setCurrentRoute] = useState('home');
+            const [lang, setLang] = useState('en');
+            const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+            const t = (key) => TRANSLATIONS[lang]?.[key] || TRANSLATIONS['en'][key] || key;
+
+            const navigate = (route) => {
+                setCurrentRoute(route);
+                setMobileMenuOpen(false);
+                window.scrollTo(0,0);
+            };
+
+            const navItems = [
+                { id: 'home', label: t('nav_home'), icon: <Home className="w-4 h-4 mr-2" /> },
+                { id: 'census-2027', label: t('nav_census'), icon: <Info className="w-4 h-4 mr-2" /> },
+                { id: 'self-enumeration', label: t('nav_self_enum'), icon: <FileText className="w-4 h-4 mr-2" /> },
+                { id: 'dates', label: t('nav_dates'), icon: <Calendar className="w-4 h-4 mr-2" /> },
+                { id: 'data-explorer', label: t('nav_data'), icon: <BarChart2 className="w-4 h-4 mr-2" /> },
+                { id: 'assistant', label: t('nav_ai'), icon: <MessageSquare className="w-4 h-4 mr-2" /> },
+                { id: 'verify', label: t('nav_verify'), icon: <ShieldCheck className="w-4 h-4 mr-2" /> },
+            ];
+
+            const renderPage = () => {
+                switch(currentRoute) {
+                    case 'home': return <HomePage navigate={navigate} t={t} />;
+                    case 'census-2027': return <CensusInfoPage />;
+                    case 'self-enumeration': return <SelfEnumerationWizard navigate={navigate} />;
+                    case 'dates': return <DatesPage />;
+                    case 'data-explorer': return <DataExplorerPage />;
+                    case 'assistant': return <AIAssistantPage />;
+                    case 'verify': return <ClaimCheckerPage />;
+                    case 'privacy': return <PrivacyPage />;
+                    case 'dashboard': return <DashboardPage navigate={navigate} />;
+                    default: return <HomePage navigate={navigate} t={t} />;
+                }
+            };
+
+            return (
+                <div className="flex flex-col min-h-screen">
+                    <div className="bg-blue-950 text-blue-100 text-xs py-2 px-4 text-center font-medium">
+                        <span className="inline-block md:hidden">Prototype App - Not an official Gov site</span>
+                        <span className="hidden md:inline-block">{t('disclaimer')}</span>
+                    </div>
+
+                    <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+                        <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
+                            <div className="flex items-center cursor-pointer" onClick={() => navigate('home')}>
+                                <div className="w-8 h-8 bg-blue-900 rounded flex items-center justify-center mr-2 relative overflow-hidden">
+                                   <div className="absolute top-0 left-0 w-full h-1 bg-orange-500"></div>
+                                   <div className="absolute bottom-0 left-0 w-full h-1 bg-green-600"></div>
+                                   <span className="text-white font-bold text-lg leading-none">C</span>
+                                </div>
+                                <span className="text-xl font-bold text-blue-950 tracking-tight">CensusSaathi<span className="text-orange-500">AI</span></span>
+                            </div>
+
+                            <nav className="hidden lg:flex items-center space-x-1">
+                                {navItems.slice(0, 5).map(item => (
+                                    <button key={item.id} onClick={() => navigate(item.id)} className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${currentRoute === item.id ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}>
+                                        {item.label}
+                                    </button>
+                                ))}
+                            </nav>
+
+                            <div className="hidden lg:flex items-center space-x-4">
+                                <select value={lang} onChange={e => setLang(e.target.value)} className="bg-slate-50 border border-slate-200 text-sm rounded-md px-2 py-1 outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer text-slate-700">
+                                    <option value="en">English</option>
+                                    <option value="hi">हिन्दी</option>
+                                    <option value="mr">मराठी</option>
+                                </select>
+                                <Button variant="ghost" className="text-slate-600 px-3 py-1.5" onClick={() => navigate('dashboard')}>
+                                    <User className="w-4 h-4 mr-2" /> {t('nav_dashboard')}
+                                </Button>
+                                <Button variant="primary" className="px-4 py-1.5 bg-orange-500 hover:bg-orange-600 text-sm shadow-sm" onClick={() => navigate('self-enumeration')}>
+                                    {t('btn_start')}
+                                </Button>
+                            </div>
+
+                            <button className="lg:hidden p-2 text-slate-600" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+                                {mobileMenuOpen ? <X /> : <Menu />}
+                            </button>
+                        </div>
+
+                        {mobileMenuOpen && (
+                            <div className="lg:hidden absolute top-16 left-0 w-full bg-white border-b border-slate-200 shadow-lg px-4 py-4 flex flex-col space-y-2">
+                                {navItems.map(item => (
+                                    <button key={item.id} onClick={() => navigate(item.id)} className={`flex items-center w-full px-4 py-3 rounded-lg text-left text-sm font-medium ${currentRoute === item.id ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'}`}>
+                                        {item.icon} {item.label}
+                                    </button>
+                                ))}
+                                <button onClick={() => navigate('privacy')} className="flex items-center w-full px-4 py-3 rounded-lg text-left text-sm font-medium text-slate-700 hover:bg-slate-50"><Shield className="w-4 h-4 mr-2"/> {t('nav_privacy')}</button>
+                                <button onClick={() => navigate('dashboard')} className="flex items-center w-full px-4 py-3 rounded-lg text-left text-sm font-medium text-slate-700 hover:bg-slate-50"><User className="w-4 h-4 mr-2"/> {t('nav_dashboard')}</button>
+                                <div className="pt-4 mt-2 border-t border-slate-100">
+                                    <label className="block text-xs font-medium text-slate-500 mb-2 px-4">Select Language</label>
+                                    <div className="flex px-4 gap-2">
+                                        {['en', 'hi', 'mr'].map(l => (
+                                            <button key={l} onClick={() => setLang(l)} className={`px-3 py-1.5 text-xs font-medium rounded border ${lang === l ? 'bg-blue-900 text-white border-blue-900' : 'bg-white text-slate-600 border-slate-300'}`}>
+                                                {l === 'en' ? 'EN' : l === 'hi' ? 'हिंदी' : 'मराठी'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </header>
+
+                    <main className="flex-1">{renderPage()}</main>
+
+                    <footer className="bg-slate-900 text-slate-400 py-10 px-6 border-t border-slate-800">
+                        <div className="max-w-7xl mx-auto grid md:grid-cols-4 gap-8">
+                            <div className="col-span-1 md:col-span-2">
+                                <div className="flex items-center mb-4">
+                                   <div className="w-6 h-6 bg-slate-700 rounded flex items-center justify-center mr-2"><span className="text-white font-bold text-xs">C</span></div>
+                                   <span className="text-lg font-bold text-white tracking-tight">CensusSaathi<span className="text-orange-500">AI</span></span>
+                                </div>
+                                <p className="text-sm mb-4 max-w-sm">An independent GenAI-powered web application prototype designed to help Indian citizens understand and participate in Census 2027 securely and easily.</p>
+                                <p className="text-xs border border-slate-700 inline-block p-2 rounded text-slate-300 bg-slate-800"><strong>Disclaimer:</strong> Not affiliated with the Govt. of India.</p>
+                            </div>
+                            <div>
+                                <h4 className="text-white font-semibold mb-4">Quick Links</h4>
+                                <ul className="space-y-2 text-sm">
+                                    <li><button onClick={() => navigate('census-2027')} className="hover:text-white transition-colors">About Census 2027</button></li>
+                                    <li><button onClick={() => navigate('self-enumeration')} className="hover:text-white transition-colors">Self-Enumeration</button></li>
+                                    <li><button onClick={() => navigate('dates')} className="hover:text-white transition-colors">Important Dates</button></li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 className="text-white font-semibold mb-4">Safety & Tools</h4>
+                                <ul className="space-y-2 text-sm">
+                                    <li><button onClick={() => navigate('privacy')} className="hover:text-white transition-colors">Privacy Policy</button></li>
+                                    <li><button onClick={() => navigate('verify')} className="hover:text-white transition-colors">Claim Checker</button></li>
+                                    <li><button onClick={() => navigate('assistant')} className="hover:text-white transition-colors">AI Assistant</button></li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div className="max-w-7xl mx-auto mt-10 pt-6 border-t border-slate-800 text-xs text-center md:text-left flex flex-col md:flex-row justify-between">
+                            <p>© 2026 CensusSaathi AI Prototype. All rights reserved.</p>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
